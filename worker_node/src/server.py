@@ -15,7 +15,6 @@ from utils import is_running_in_container
 import requests
 from flask import jsonify
 from dotenv import load_dotenv
-import time
 
 logging.basicConfig(level=logging.INFO)
 BASE_DIR = (Path(__file__).parent / "code").absolute()
@@ -265,8 +264,6 @@ def upload_file():
 
 
 
-
-
 @app.route('/multi_process', methods=['POST'])    #Endpoint usado para o processamento dos códigos submetidos com multiprocessamento de todos os casos de teste
 def multi_process():
     #logging.info(request.files)
@@ -475,8 +472,8 @@ def multi_process():
 
 #Teste de comunicação com a API Django:
 def get_problem(problem_id):
-    #django_api_url = f'{os.getenv("DJANGO_API_URL")}/{problem_id}/'  # URL da API Django    #Aparentemente, variáveis de ambiente não funcionam no modo debug
-    django_api_url = f'http://localhost:8000/pt-br/problem_details/{problem_id}/'  # URL da API Django (modo debug)
+    django_api_url = f'{os.getenv("DJANGO_API_URL")}/{problem_id}/'  # URL da API Django    #Aparentemente, variáveis de ambiente não funcionam no modo debug
+    #django_api_url = f'http://localhost:8000/pt-br/problem_details/{problem_id}/'  # URL da API Django (modo debug)
     try:
         response = requests.get(django_api_url, timeout=5)  # Timeout para evitar travamento
         response.raise_for_status()  # Levanta exceções para erros HTTP
