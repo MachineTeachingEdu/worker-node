@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-machine-teaching-worker
+spec:
+  type: NodePort
+  ports:
+    - port: 5000
+
+  selector:
+    app: machine-teaching-worker

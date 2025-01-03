@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: machine-teaching-workers-deployment
+  labels:
+    app: machine-teaching-worker
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: machine-teaching-worker
+  template:
+    metadata:
+      labels:
+        app: machine-teaching-worker
+    spec:
+      containers:
+        - name: machine-teaching-containers
+          image: gcr.io/tcc-mt/machine-teaching-worker:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: machine-teaching-worker-configmap
