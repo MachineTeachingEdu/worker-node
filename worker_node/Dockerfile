@@ -6,7 +6,7 @@ ENV RUNNING_IN_DOCKER=True
 #Para rodar localmente:
 #ENV DJANGO_API_URL=http://localhost:8000/pt-br/problem_details
 #Para rodar um container no docker-compose:
-ENV DJANGO_API_URL=http://web:8020/pt-br/problem_details
+#ENV DJANGO_API_URL=http://web:8020/pt-br/problem_details
 WORKDIR /app
 
 #Expondo a porta 5000

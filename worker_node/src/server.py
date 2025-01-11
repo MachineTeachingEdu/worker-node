@@ -281,8 +281,7 @@ def multi_process():
     except Exception:
         return {'errorMsg': "Error: AJAX call with invalid arguments."}, 400
     
-    
-    
+    """
     #Primeiramente, recuperando os dados com a API Django enviando o id do problema (usar try/except)
     try:
         problem_data, status_code = get_problem(problem_id)
@@ -305,6 +304,21 @@ def multi_process():
             testCases.append(json.loads(teste))
     except Exception as e:
         return {'errorMsg': "Error: Couldn't get problem data from Django API."}, 500
+    """
+    
+    try:
+        professorCode = request.form.get("professor_code")
+        funcName = request.form.get("func")
+        returnType = request.form.get("return_type")
+        if not returnType:
+            returnType = ""
+        testCasesRaw = json.loads(request.form['test_cases'])  #Desserializa a string JSON
+        formattedTestCases = [f'"{str(element)}"' for element in testCasesRaw]
+        testCases = []
+        for teste in formattedTestCases:
+            testCases.append(json.loads(teste))
+    except Exception as e:
+        return {'errorMsg': "Invalid data."}, 500
     
     #Pré-processamento
     if file and _valid_file(file.filename):
@@ -472,8 +486,8 @@ def multi_process():
 
 #Teste de comunicação com a API Django:
 def get_problem(problem_id):
-    django_api_url = f'{os.getenv("DJANGO_API_URL")}/{problem_id}/'  # URL da API Django    #Aparentemente, variáveis de ambiente não funcionam no modo debug
-    #django_api_url = f'http://localhost:8000/pt-br/problem_details/{problem_id}/'  # URL da API Django (modo debug)
+    #django_api_url = f'{os.getenv("DJANGO_API_URL")}/{problem_id}/'  # URL da API Django    #Aparentemente, variáveis de ambiente não funcionam no modo debug
+    django_api_url = f'http://localhost:8000/pt-br/problem_details/{problem_id}/'  # URL da API Django (modo debug)
     try:
         response = requests.get(django_api_url, timeout=5)  # Timeout para evitar travamento
         response.raise_for_status()  # Levanta exceções para erros HTTP
