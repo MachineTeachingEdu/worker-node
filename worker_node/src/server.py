@@ -12,9 +12,10 @@ import logging
 import json
 from languagefactory import LanguageFactory
 from utils import is_running_in_container
-import requests
 from flask import jsonify
 from dotenv import load_dotenv
+#import google.auth.transport.requests
+#import google.oauth2.id_token
 
 logging.basicConfig(level=logging.INFO)
 BASE_DIR = (Path(__file__).parent / "code").absolute()
@@ -266,7 +267,23 @@ def upload_file():
 
 @app.route('/multi_process', methods=['POST'])    #Endpoint usado para o processamento dos códigos submetidos com multiprocessamento de todos os casos de teste
 def multi_process():
-    #logging.info(request.files)
+    """
+    logging.info("Iniciando processamento...")
+    if os.getenv('GCR_INSTANCE'):
+        logging.info("Running on GCR. Checking authorization.")
+        #Verificação do GCR:
+        auth_header = request.headers.get("Authorization")
+        if not auth_header:
+            abort(400, 'Missing authorization header')
+        else:
+            auth_type, creds = auth_header.split(" ", 1)
+            if auth_type.lower() == "bearer":
+                google.oauth2.id_token.verify_token(creds, google.auth.transport.requests.Request())
+                logging.info("Authorization check passed.")
+    else:
+        logging.info("Not running on GCR. No authorization check needed.")
+    """
+
     if 'file' not in request.files:
         abort(400, 'Missing submission file')
         
@@ -483,7 +500,8 @@ def multi_process():
     else:
         abort(400, 'Invalid file')
     
-
+"""
+#API não está mais sendo usada
 #Teste de comunicação com a API Django:
 def get_problem(problem_id):
     #django_api_url = f'{os.getenv("DJANGO_API_URL")}/{problem_id}/'  # URL da API Django    #Aparentemente, variáveis de ambiente não funcionam no modo debug
@@ -499,7 +517,7 @@ def get_problem(problem_id):
     except requests.exceptions.RequestException as e:
         app.logger.error(f"Erro ao se comunicar com a API Django: {e}")
         return jsonify({'error': 'Failed to fetch data from Django API'}), 500
-    
+"""
     
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=int(os.getenv('PORT', 5000)))
