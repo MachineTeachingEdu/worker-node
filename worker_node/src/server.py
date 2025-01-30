@@ -14,8 +14,8 @@ from languagefactory import LanguageFactory
 from utils import is_running_in_container
 from flask import jsonify
 from dotenv import load_dotenv
-#import google.auth.transport.requests
-#import google.oauth2.id_token
+import google.auth.transport.requests
+import google.oauth2.id_token
 
 logging.basicConfig(level=logging.INFO)
 BASE_DIR = (Path(__file__).parent / "code").absolute()
@@ -267,10 +267,9 @@ def upload_file():
 
 @app.route('/multi_process', methods=['POST'])    #Endpoint usado para o processamento dos códigos submetidos com multiprocessamento de todos os casos de teste
 def multi_process():
-    """
-    logging.info("Iniciando processamento...")
+    #logging.info("Iniciando processamento...")
     if os.getenv('GCR_INSTANCE'):
-        logging.info("Running on GCR. Checking authorization.")
+        #logging.info("Running on GCR. Checking authorization.")
         #Verificação do GCR:
         auth_header = request.headers.get("Authorization")
         if not auth_header:
@@ -279,10 +278,10 @@ def multi_process():
             auth_type, creds = auth_header.split(" ", 1)
             if auth_type.lower() == "bearer":
                 google.oauth2.id_token.verify_token(creds, google.auth.transport.requests.Request())
-                logging.info("Authorization check passed.")
-    else:
-        logging.info("Not running on GCR. No authorization check needed.")
-    """
+                #logging.info("Authorization check passed.")
+    #else:
+        #logging.info("Not running on GCR. No authorization check needed.")
+
 
     if 'file' not in request.files:
         abort(400, 'Missing submission file')
