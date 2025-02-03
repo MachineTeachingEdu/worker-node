@@ -175,11 +175,8 @@ def process_errors(stderr: str, offSetLines: int, baseCodeLines: int, file_path:
     return error_message
 
 def convert_single_to_double_quotes(arg_string):
-    pattern = r"'([^']+)'"
-    def replace_quotes(match):
-        content = match.group(1)
-        if len(content) > 1:  #Somente substitui aspas de strings com mais de 1 caractere
-            return '"' + content + '"'
-        else:
-            return "'" + content + "'"  #Mantém aspas simples para strings de 1 caractere
-    return re.sub(pattern, replace_quotes, arg_string) #Aplicando o regex na string original
+    arg_string = re.sub(r"''", r'""', arg_string)   #Substitui strings vazias '' por ""
+    arg_string = re.sub(r"'([^']+)'", r'"\1"', arg_string)   #Substitui aspas simples internas por aspas duplas para palavras com mais de um caractere
+    arg_string = re.sub(r'"(.)"', r"'\1'", arg_string)   #Mantém aspas simples para strings de 1 caractere
+    arg_string = re.sub(r'^"|"$', "'", arg_string)    #Substitui as aspas duplas externas por aspas simples
+    return arg_string
