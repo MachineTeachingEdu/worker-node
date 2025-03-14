@@ -1,5 +1,5 @@
 from baselanguage import BaseLanguage
-from exceptions import CodeException, PrintException
+from exceptions import CodeException, PrintException, ImportException
 import subprocess
 import os
 import re
@@ -101,6 +101,7 @@ class JuliaLanguage(BaseLanguage):
         has_print = bool(print_regex.search(code_without_comments))
         if has_print:
             raise PrintException("")
+        verify_against_blacklist(code_without_comments)   #Verificando importações inválidas
         self.__baseCodeLines = len(code.splitlines())
         self.run_pre_process_code(code_path)
         return code_without_comments
@@ -180,3 +181,30 @@ def convert_single_to_double_quotes(arg_string):
     arg_string = re.sub(r'"(.)"', r"'\1'", arg_string)   #Mantém aspas simples para strings de 1 caractere
     arg_string = re.sub(r'^"|"$', "'", arg_string)    #Substitui as aspas duplas externas por aspas simples
     return arg_string
+
+def verify_against_blacklist(code: str):
+    blacklist = [
+        r'\busing\s+FileIO\b',               # using FileIO
+        r'\busing\s+Sockets\b',              # using Sockets
+        r'\busing\s+Distributed\b',          # using Distributed
+        r'\busing\s+Libc\b',                 # using Libc
+        r'\busing\s+Libdl\b',                # using Libdl (usado para manipulação de bibliotecas externas)
+        r'\busing\s+DelimitedFiles\b',       # using DelimitedFiles (permite leitura e escrita de arquivos)
+        r'\busing\s+Base\b',                 # using Base (excesso de permissões)
+        r'\bimport\s+FileIO\b',              # import FileIO
+        r'\bimport\s+Sockets\b',             # import Sockets
+        r'\bimport\s+Distributed\b',         # import Distributed
+        r'\bimport\s+Libc\b',                # import Libc
+        r'\bimport\s+Libdl\b',               # import Libdl
+        r'\bimport\s+Base\b',                # import Base (excesso de permissões)
+        r'\bopen\s*\(',                      # open(...)
+        r'\brun\s*\(',                       # run(...)
+        r'\beval\s*\(',                      # eval(...)
+        r'\bsystem\s*\(',                    # system(...) - execução de comandos do sistema
+        r'\bread\s*\(',                      # read(...) - leitura de arquivos
+        r'\bwrite\s*\(',                     # write(...) - escrita de arquivos
+    ]
+
+    for pattern in blacklist:
+        if re.search(pattern, code):
+            raise ImportException("Not allowed import or method found.")

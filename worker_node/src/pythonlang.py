@@ -128,19 +128,23 @@ def process_errors(stderr: str, offSetLines: int):
         return_message += f" on line {line_number}"
     return return_message
 
-
 def verify_against_blacklist(code: str):
-    if "import os" in code:
-        raise ImportException("os não é úm módulo permitido")
-    if "import subprocess" in code:
-        raise ImportException("subprocess não é úm módulo permitido")
-    if "import sys" in code:
-        raise ImportException("sys não é úm módulo permitido")
-    if "import socket" in code:
-        raise ImportException("socket não é úm módulo permitido")
-    if "import threading" in code:
-        raise ImportException("threading não é úm módulo permitido")
-    if "import multiprocessing" in code:
-        raise ImportException("multiprocessing não é úm módulo permitido")
-    if " open(" in code:
-        raise ImportException("'open' não é um método permitido")
+    blacklist = [
+        r'\bimport\s*\bos\b',                   # import os
+        r'\bimport\s*\bsubprocess\b',            # import subprocess
+        r'\bimport\s*\bsys\b',                   # import sys
+        r'\bimport\s*\bsocket\b',                # import socket
+        r'\bimport\s*\bthreading\b',             # import threading
+        r'\bimport\s*\bmultiprocessing\b',       # import multiprocessing
+        r'\bfrom\s+os\s+import\b',               # from os import ...
+        r'\bfrom\s+subprocess\s+import\b',       # from subprocess import ...
+        r'\bfrom\s+sys\s+import\b',              # from sys import ...
+        r'\bfrom\s+socket\s+import\b',           # from socket import ...
+        r'\bfrom\s+threading\s+import\b',        # from threading import ...
+        r'\bfrom\s+multiprocessing\s+import\b',  # from multiprocessing import ...
+        r'\bopen\s*\(',                          # open(...)
+    ]
+
+    for pattern in blacklist:
+        if re.search(pattern, code):
+            raise ImportException("Not allowed import or method found.")

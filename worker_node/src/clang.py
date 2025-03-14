@@ -184,4 +184,18 @@ def verify_against_blacklist(code):
     if file_operations_found:
         raise DangerException("File operations functions are not allowed.")
     
+    dangerous_patterns = [
+        r"#include\s*<unistd.h>",     # chamadas do sistema
+        r"#include\s*<sys/.*>",       # manipulação de kernel
+        r"\bsystem\b\s*\(",               # comandos no shell
+        r"\bpopen\b\s*\(",                # executa processos
+        r"\bfork\b\s*\(",                 # cria novos processos
+        r"\bexec[lv][ep]?\b\s*\(",        # executa binários (execl, execv, execlp, execvp)
+        r"#\s*define"                     # prevenção contra macros
+    ]
+
+    for pattern in dangerous_patterns:
+        if re.search(pattern, code):
+            raise DangerException("Potentially dangerous code found.")
+    
     return
