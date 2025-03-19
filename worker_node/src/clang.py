@@ -83,7 +83,7 @@ int main(){{
         compile_code(file_path, 3, self.__baseCodeLines)
     
     def pre_process_code(self, code: str, code_path: str):
-        code_without_comments = re.sub(r'\/\/.*$', '', code, flags=re.MULTILINE)
+        code_without_comments = re.sub(r'(?<!["])\/\/.*$', '', code, flags=re.MULTILINE)
         code_without_comments = re.sub(r'\/\*[\s\S]*?\*\/', '', code_without_comments, flags=re.MULTILINE)
         code_without_comments = code_without_comments.strip()
         print_regex = re.compile(r'\b(printf|puts)\s*\(.*\)')
@@ -99,7 +99,7 @@ int main(){{
         with open(code_path, 'w') as file:
             file.write(codeWithMain)
         self.run_pre_process_code(code_path)   #Checando por erros na compilação do código
-        return code_without_comments
+        return code
 
 formats_printf = {
     "int": "%d",

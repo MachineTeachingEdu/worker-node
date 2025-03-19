@@ -105,7 +105,7 @@ if error:
     
     
     def pre_process_code(self, code: str, code_path: str):
-        code_without_comments = re.sub(r'#.*$', '', code, flags=re.MULTILINE)
+        code_without_comments = re.sub(r'(?<!["\'])#.*$', '', code, flags=re.MULTILINE)
         code_without_comments = re.sub(r"'''[\s\S]*?'''|\"\"\"[\s\S]*?\"\"\"", '', code_without_comments, flags=re.MULTILINE)
         code_without_comments = code_without_comments.strip()
         print_regex = re.compile(r'\bprint\s*\(.*\)')
@@ -114,7 +114,7 @@ if error:
             raise PrintException("")
         verify_against_blacklist(code_without_comments)   #Verificando importações inválidas
         self.run_pre_process_code(code_path)   #Verificando erros de sintaxe
-        return code_without_comments
+        return code
     
 
 def process_errors(stderr: str, offSetLines: int):

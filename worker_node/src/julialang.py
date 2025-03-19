@@ -95,7 +95,7 @@ class JuliaLanguage(BaseLanguage):
     
     def pre_process_code(self, code: str, code_path: str):
         code_without_comments = re.sub(r'#=(.*?)=#', '', code, flags=re.DOTALL)
-        code_without_comments = re.sub(r'#.*$', '', code_without_comments, flags=re.MULTILINE)
+        code_without_comments = re.sub(r'(?<!["\'])#.*$', '', code_without_comments, flags=re.MULTILINE)
         code_without_comments = code_without_comments.strip()
         print_regex = re.compile(r'\b(print|println)\s*\(.*\)|@\b(printf|show)\b')
         has_print = bool(print_regex.search(code_without_comments))
@@ -104,7 +104,7 @@ class JuliaLanguage(BaseLanguage):
         verify_against_blacklist(code_without_comments)   #Verificando importações inválidas
         self.__baseCodeLines = len(code.splitlines())
         self.run_pre_process_code(code_path)
-        return code_without_comments
+        return code
     
     
 def process_errors(stderr: str, offSetLines: int, baseCodeLines: int, file_path: str):
