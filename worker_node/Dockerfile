@@ -36,5 +36,5 @@ CMD gunicorn \
     --max-requests-jitter 0 \
     --bind 0.0.0.0:$PORT \
     --timeout 200 \
-    -w 7 \
+    -w 11 \
     'server:app'
