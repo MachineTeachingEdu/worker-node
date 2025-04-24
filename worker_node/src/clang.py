@@ -115,13 +115,19 @@ formats_printf = {
 }
 
 def extract_args(args):
-    list_args = json.loads(args)
+    arg_string = re.sub(r"'([^']+)'", r'"\1"', args)   #Substitui aspas simples internas por aspas duplas
+    list_args = json.loads(arg_string)
     argsTxt = ""
     for i, arg in enumerate(list_args):
-        if i == len(list_args) - 1:
-            argsTxt += f"{arg}"
+        if isinstance(arg, str):
+            if len(arg) == 1:
+                argsTxt += f"'{arg}'"
+            else:
+                argsTxt += f'"{arg}"'
         else:
-            argsTxt += f"{arg}, "
+            argsTxt += f"{arg}"
+        if i != len(list_args) - 1:
+            argsTxt += f", "
     return argsTxt
 
 def compile_code(file_path: str, offSetLines: int, baseCodeLines: int):

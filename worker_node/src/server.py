@@ -14,6 +14,7 @@ from languagefactory import LanguageFactory
 from utils import is_running_in_container
 import google.auth.transport.requests
 import google.oauth2.id_token
+import re
 
 logging.basicConfig(level=logging.INFO)
 BASE_DIR = (Path(__file__).parent / "code").absolute()
@@ -117,11 +118,24 @@ def multi_process():
         returnType = request.form.get("return_type")
         if not returnType:
             returnType = ""
-        testCasesRaw = json.loads(request.form['test_cases'])  #Desserializa a string JSON
-        formattedTestCases = [f'"{str(element)}"' for element in testCasesRaw]
+            
+            
         testCases = []
-        for teste in formattedTestCases:
-            testCases.append(json.loads(teste))
+        if request.form.get("custom_test_cases"):   #No caso de haver casos de teste personalizados
+            formattedTestCases = request.form.getlist('test_cases')
+            for testCase in formattedTestCases:
+                #Converte unicode \uXXXX para caractere real
+                testCase = re.sub(r'\\u([0-9a-fA-F]{4})', lambda m: chr(int(m.group(1), 16)), testCase)
+                #Troca aspas duplas por simples
+                testCase = re.sub(r'"([^"]*?)"', r"'\1'", testCase)
+                testCases.append(testCase)
+        else:
+            testCasesRaw = json.loads(request.form['test_cases'])  #Desserializa a string JSON
+            formattedTestCases = [f'"{str(element)}"' for element in testCasesRaw]
+            for teste in formattedTestCases:
+                testCases.append(json.loads(teste))
+                
+        
     except Exception as e:
         return {'errorMsg': "Invalid data."}, 500
     
@@ -209,7 +223,7 @@ def multi_process():
             time.sleep(2)
         """
 
-        tle = False
+        #tle = False
         for index, testCase in enumerate(testCases):
             #print(testCase)
             try:
@@ -243,7 +257,7 @@ def multi_process():
                 }
                 status_code = 400
             except subprocess.TimeoutExpired:
-                tle = True
+                #tle = True
                 result = {
                     'isCorrect': False,
                     'code_output': "Time limit exceeded: O código excedeu o tempo limite de execução.",
@@ -278,10 +292,10 @@ def multi_process():
             resultItem['result'] = result
             resultItem['status_code'] = status_code
             resultItem['num_test_cases'] = len(testCases)   #Adicionado para fazer os testes automatizados
-            if tle:
-                results.clear()
-                results.append(resultItem)
-                break
+            #if tle:
+            #    results.clear()
+            #    results.append(resultItem)
+            #    break
             results.append(resultItem)
         """
         if(lang == "Julia"):
