@@ -223,7 +223,7 @@ def multi_process():
             time.sleep(2)
         """
 
-        #tle = False
+        tle = False
         for index, testCase in enumerate(testCases):
             #print(testCase)
             try:
@@ -257,7 +257,7 @@ def multi_process():
                 }
                 status_code = 400
             except subprocess.TimeoutExpired:
-                #tle = True
+                tle = True
                 result = {
                     'isCorrect': False,
                     'code_output': "Time limit exceeded: O código excedeu o tempo limite de execução.",
@@ -292,10 +292,10 @@ def multi_process():
             resultItem['result'] = result
             resultItem['status_code'] = status_code
             resultItem['num_test_cases'] = len(testCases)   #Adicionado para fazer os testes automatizados
-            #if tle:
-            #    results.clear()
-            #    results.append(resultItem)
-            #    break
+            if tle:
+                results.clear()
+                results.append(resultItem)
+                break
             results.append(resultItem)
         """
         if(lang == "Julia"):
