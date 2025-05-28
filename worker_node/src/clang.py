@@ -134,7 +134,7 @@ def compile_code(file_path: str, offSetLines: int, baseCodeLines: int):
     file_name_with_extension = os.path.basename(file_path)  #Nome do arquivo (com extensão)
     file_name = os.path.splitext(file_name_with_extension)[0]
     exec_file_path = file_path.replace(file_name_with_extension, file_name)
-    compile_result = subprocess.run(['gcc', '-o', exec_file_path, file_path, '-lm'], capture_output=True, text=True, timeout=10)  #Importando a biblioteca math.h
+    compile_result = subprocess.run(['gcc', '-Wuninitialized', '-Werror', '-o', exec_file_path, file_path, '-lm'], capture_output=True, text=True, timeout=10)  #Importando a biblioteca math.h
     if compile_result.stderr != "":
         error_message = process_compile_errors(compile_result.stderr, offSetLines, baseCodeLines)
         raise CodeException(error_message)
