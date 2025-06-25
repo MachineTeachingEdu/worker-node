@@ -94,6 +94,7 @@ int main(){{
         self.__baseCodeLines = len(code.splitlines())
         
         importPart = "#include <stdio.h>\n#include <string.h>\n#include <stdlib.h>\n"
+        #importPart = '#include <stdio.h>\n#include <string.h>\n#include <stdlib.h>\n#include "run_me_prof.c"\n'    #TESTE
         mainPart = "\nint main() {return 0;}"
         codeWithMain = importPart + code + mainPart
         with open(code_path, 'w') as file:
@@ -115,26 +116,31 @@ formats_printf = {
 }
 
 def extract_args(args):
-    arg_string = re.sub(r"'([^']+)'", r'"\1"', args)   #Substitui aspas simples internas por aspas duplas
-    list_args = json.loads(arg_string)
-    argsTxt = ""
-    for i, arg in enumerate(list_args):
-        if isinstance(arg, str):
-            if len(arg) == 1:
-                argsTxt += f"'{arg}'"
+    try:
+        arg_string = re.sub(r"'([^']+)'", r'"\1"', args)  #Substitui aspas simples internas por aspas duplas
+        list_args = json.loads(arg_string)
+        argsTxt = ""
+        for i, arg in enumerate(list_args):
+            if isinstance(arg, str):
+                if len(arg) == 1:
+                    argsTxt += f"'{arg}'"
+                else:
+                    argsTxt += f'"{arg}"'
             else:
-                argsTxt += f'"{arg}"'
-        else:
-            argsTxt += f"{arg}"
-        if i != len(list_args) - 1:
-            argsTxt += f", "
-    return argsTxt
+                argsTxt += f"{arg}"
+            if i != len(list_args) - 1:
+                argsTxt += f", "
+        return argsTxt
+    except json.JSONDecodeError:     #Se o caso de teste for algo personalizado não no formato de lista JSON
+        args_formatted = args.strip()[1:-1].strip()
+        return args_formatted
+
 
 def compile_code(file_path: str, offSetLines: int, baseCodeLines: int):
     file_name_with_extension = os.path.basename(file_path)  #Nome do arquivo (com extensão)
     file_name = os.path.splitext(file_name_with_extension)[0]
     exec_file_path = file_path.replace(file_name_with_extension, file_name)
-    compile_result = subprocess.run(['gcc', '-Wuninitialized', '-Werror', '-o', exec_file_path, file_path, '-lm'], capture_output=True, text=True, timeout=10)  #Importando a biblioteca math.h
+    compile_result = subprocess.run(['gcc', '-O1', '-Wuninitialized', '-Werror', '-o', exec_file_path, file_path, '-lm'], capture_output=True, text=True, timeout=10)  #Importando a biblioteca math.h
     if compile_result.stderr != "":
         error_message = process_compile_errors(compile_result.stderr, offSetLines, baseCodeLines)
         raise CodeException(error_message)
