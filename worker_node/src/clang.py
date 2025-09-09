@@ -8,7 +8,7 @@ import signal
 
 class CLanguage(BaseLanguage):
     def __init__(self, langExtension:str):
-        self.__offsetCodeLines = 4  #Offset de linhas que vêm antes do código do usuário
+        self.__offsetCodeLines = 5  #Offset de linhas que vêm antes do código do usuário
         self.__baseCodeLines = -1
         super().__init__(langExtension)
     
@@ -19,12 +19,18 @@ class CLanguage(BaseLanguage):
         self.__baseCodeLines = len(baseCode.splitlines())
         printf_returnType = formats_printf[returnType]
         line_comparison = f'printf("%d\\n", {funcName}({argsTxt}) == {funcNameProf}({argsTxt}));'
+        
+        if printf_returnType == "%f" or printf_returnType == "%lf":    #Se o retorno for do tipo float ou double, a comparação será feita com uma tolerância
+            tolerancia = '0.0001'    #Tolerância
+            line_comparison = f'printf("%d\\n", fabs({funcName}({argsTxt}) - {funcNameProf}({argsTxt})) < {tolerancia});'
+            
         if printf_returnType == "%s":  #Se o retorno for uma string, a comparação será feita com a função strcmp
             line_comparison = f'printf("%d\\n", strcmp({funcName}({argsTxt}), {funcNameProf}({argsTxt})) == 0);'
         
         resultArgs = f"""#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 #include "{name_file_professor}{self.langExtension}"
 {baseCode}
 int main() {{
@@ -56,7 +62,10 @@ int main(){{
         exec_file_path = compile_code(file_path, self.__offsetCodeLines, self.__baseCodeLines)
         run_result = subprocess.run([exec_file_path], capture_output=True, text=True, timeout=10)
         if run_result.stderr != "":
-            raise CodeException(run_result.stderr)
+            error_msg = process_runtime_errors(run_result.stderr, self.__offsetCodeLines)
+            if error_msg == "":
+                error_msg = run_result.stderr
+            raise CodeException(error_msg)
         if run_result.returncode != 0:
             signal_number = -run_result.returncode
             signal_name = signal.Signals(signal_number).name
@@ -140,7 +149,8 @@ def compile_code(file_path: str, offSetLines: int, baseCodeLines: int):
     file_name_with_extension = os.path.basename(file_path)  #Nome do arquivo (com extensão)
     file_name = os.path.splitext(file_name_with_extension)[0]
     exec_file_path = file_path.replace(file_name_with_extension, file_name)
-    compile_result = subprocess.run(['gcc', '-O1', '-Wuninitialized', '-Werror', '-o', exec_file_path, file_path, '-lm'], capture_output=True, text=True, timeout=10)  #Importando a biblioteca math.h
+    #compile_result = subprocess.run(['gcc', '-O1', '-Wuninitialized', '-Werror', '-o', exec_file_path, file_path, '-lm'], capture_output=True, text=True, timeout=10)  #Importando a biblioteca math.h
+    compile_result = subprocess.run(['gcc', '-O1', '-Wuninitialized', '-Werror', '-Wall', '-g', '-fsanitize=address', '-o', exec_file_path, file_path, '-lm'], capture_output=True, text=True, timeout=10)  #Importando a biblioteca math.h
     if compile_result.stderr != "":
         error_message = process_compile_errors(compile_result.stderr, offSetLines, baseCodeLines)
         raise CodeException(error_message)
@@ -179,6 +189,30 @@ def process_compile_errors(compile_error: str, offSetLines: int, baseCodeLines: 
     
     error_message = f"{function_error[:-1]}"
     return error_message
+
+
+def process_runtime_errors(runtime_error: str, offSetLines: int):
+    summary_pattern = re.compile(r"SUMMARY:\s+(\w+):\s+([\w-]+)\s+(.*?):(\d+)(?::(\d+))?")
+    match_sanitizer = summary_pattern.search(runtime_error)
+    
+    if match_sanitizer:
+        snt_type = match_sanitizer.group(1) if match_sanitizer.group(1) else "Erro: Sanitizer"
+        snt_message_type = match_sanitizer.group(2) if match_sanitizer.group(2) else "Error"
+        #snt_filename = match_sanitizer.group(3)
+        snt_line = f"At line {int(match_sanitizer.group(4)) - offSetLines}" if match_sanitizer.group(4) else ""
+        snt_column = f", column {int(match_sanitizer.group(5))}" if match_sanitizer.group(5) else ""
+        snt_message = "Um erro de tempo de execução ocorreu. Verifique seu código."  #Mensagem padrão
+        
+        message_pattern = re.compile(r"^\s*(READ|WRITE) of size \d+.*$", re.MULTILINE)
+        msg_match = message_pattern.search(runtime_error)
+        if msg_match:
+            snt_message = msg_match.group(0).strip()
+
+        error_message = f"RUNTIME ERROR\n{snt_type}: {snt_message_type}\n{snt_line}{snt_column}: {snt_message}"
+        return error_message
+    
+    return ""
+    
 
 def verify_against_blacklist(code):
     memory_leak_patterns = [  #Verificando uso de funções de alocação de memória
