@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ambientes Virtuais
+venv/
+.venv/
+env/
+.env
+
+# Dependências e pacotes de build
+*.egg-info/
+build/
+dist/
+wheels/
+pip-wheel-metadata/
+*.manifest
+*.spec
+
+# Bancos de dados locais
+*.db
+*.sqlite3
+
+# Arquivos de configuração de IDEs e editores
+.vscode/
+.idea/
+*.project
+*.pydevproject
+.DS_Store
+Thumbs.db
+
+# Arquivos de teste e cobertura de código
+.pytest_cache/
+.coverage
+htmlcov/
+pytestdebug.log
+
+# Arquivos de log e outros artefatos
+*.log

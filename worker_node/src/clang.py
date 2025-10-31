@@ -5,6 +5,7 @@ import subprocess
 import json
 import re
 import signal
+from utils import is_running_in_container
 
 class CLanguage(BaseLanguage):
     def __init__(self, langExtension:str):
@@ -150,7 +151,11 @@ def compile_code(file_path: str, offSetLines: int, baseCodeLines: int):
     file_name = os.path.splitext(file_name_with_extension)[0]
     exec_file_path = file_path.replace(file_name_with_extension, file_name)
     #compile_result = subprocess.run(['gcc', '-O1', '-Wuninitialized', '-Werror', '-o', exec_file_path, file_path, '-lm'], capture_output=True, text=True, timeout=10)  #Importando a biblioteca math.h
-    compile_result = subprocess.run(['gcc', '-O1', '-Wuninitialized', '-Werror', '-Wall', '-g', '-fsanitize=address', '-o', exec_file_path, file_path, '-lm'], capture_output=True, text=True, timeout=10)  #Importando a biblioteca math.h
+    #compile_result = subprocess.run(['gcc', '-O1', '-Wuninitialized', '-Werror', '-Wall', '-g', '-fsanitize=address', '-o', exec_file_path, file_path, '-lm'], capture_output=True, text=True, timeout=10)  #Importando a biblioteca math.h
+    list_compile = ['gcc', '-O1', '-Wuninitialized', '-Werror', '-Wall', '-o', exec_file_path, file_path, '-lm']
+    if not is_running_in_container() or os.getenv('GCR_INSTANCE'):  #Se não estiver rodando no container local ou se estiver no GCR, habilita o address sanitizer (por algum motivo o sanitizer piora muito a performance no container local)
+        list_compile = ['gcc', '-O1', '-Wuninitialized', '-Werror', '-Wall', '-g', '-fsanitize=address', '-o', exec_file_path, file_path, '-lm']
+    compile_result = subprocess.run(list_compile, capture_output=True, text=True, timeout=10)
     if compile_result.stderr != "":
         error_message = process_compile_errors(compile_result.stderr, offSetLines, baseCodeLines)
         raise CodeException(error_message)

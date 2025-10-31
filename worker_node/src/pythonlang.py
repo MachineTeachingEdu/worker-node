@@ -6,6 +6,7 @@ import os
 import json
 import subprocess
 import re
+#import sys
 
 class PythonLanguage(BaseLanguage):
     def __init__(self, langExtension:str):   
@@ -22,10 +23,10 @@ def execute_code():
     try:
         from {name_file_professor} import {funcName} as {funcNameProf}
 {baseCode}
-        print({funcName}(*{arg}) == {funcNameProf}(*{arg}))
-        print({funcName}(*{arg}))
-        print({funcNameProf}(*{arg}))
-        print("NoErrors")
+        print({funcName}(*{arg}) == {funcNameProf}(*{arg}), flush=True)
+        print({funcName}(*{arg}), flush=True)
+        print({funcNameProf}(*{arg}), flush=True)
+        print("NoErrors", flush=True)
     except Exception as e:
         return e, traceback.extract_tb(e.__traceback__)
     return None, None
@@ -36,7 +37,7 @@ if error:
     line_number = tb_last.lineno - {self.__offsetCodeLines}    #Aqui é necessário diminuir por um offset
     error_type = type(error).__name__
     error_message = str(error)
-    print(f"{{line_number}}\\n{{error_type}}\\n{{error_message}}")"""
+    print(f"{{line_number}}\\n{{error_type}}\\n{{error_message}}", flush=True)"""
         return resultArgs
     
     def professor_code_with_args(self, professorCode: str, funcName: str, funcNameProf: str, arg, returnType = ""):
@@ -48,10 +49,38 @@ if error:
         sast_result_file_path = absolute_path.replace(".py", "") + "_result.json"
         if is_running_in_container():
             os.system(f'bandit -c bandit_config.yml "{absolute_path}"  -f json -o "{sast_result_file_path}"')    #Esta linha é para o container
+            test_output = json.load(Path(sast_result_file_path).open())
         else:
-            os.system(f'bandit -c /home/nickashu/testeWorkerNode/remote-code-executor/worker_node/bandit_config.yml "{absolute_path}"  -f json -o "{sast_result_file_path}"')
+            try:
+                base_dir = Path(__file__).resolve().parent.parent
+                config_path = base_dir / "bandit_config.yml"
 
-        test_output = json.load(Path(sast_result_file_path).open())
+                command = [
+                    "bandit",
+                    "-c", str(config_path),
+                    "-f", "json",
+                    "-o", sast_result_file_path,
+                    "-r", absolute_path
+                ]
+                
+                subprocess.run(command, check=True, capture_output=True, text=True)
+
+            except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                raise CodeException(f"Bandit security scan failed: {e}")
+
+            try:
+                sast_result_path = Path(sast_result_file_path)
+                if not sast_result_path.exists() or sast_result_path.stat().st_size == 0:
+                    return
+
+                with sast_result_path.open(encoding='utf-8') as f:
+                    test_output = json.load(f)
+
+            except json.JSONDecodeError:
+                raise CodeException(f"Error decoding JSON from bandit output file.")
+            #os.system(f'bandit -c /home/nickashu/testeWorkerNode/remote-code-executor/worker_node/bandit_config.yml "{absolute_path}"  -f json -o "{sast_result_file_path}"')
+
+        #test_output = json.load(Path(sast_result_file_path).open())
         metrics = test_output["metrics"]
         HIGH_SEVERITY = metrics["_totals"]["SEVERITY.HIGH"]
         MEDIUM_SEVERITY = metrics["_totals"]["SEVERITY.MEDIUM"]

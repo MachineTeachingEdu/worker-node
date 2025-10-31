@@ -1,5 +1,5 @@
 from pathlib import Path
-from flask import Flask, request,  abort
+from flask import Flask, request, abort, jsonify
 from werkzeug.utils import secure_filename
 import os
 import zipfile
@@ -305,7 +305,7 @@ def multi_process():
         """
 
         _delete_temp_files(TEMP_DIR)
-        return results
+        return jsonify(results)
     else:
         abort(400, 'Invalid file')
     
