@@ -1,8 +1,26 @@
 # Worker Node - Documentação
 
+## Índice
+
+1. [Visão Geral](#visão-geral)
+2. [Arquitetura](#arquitetura)
+3. [Fluxo de Processamento](#fluxo-de-processamento)
+4. [Especificidades de cada linguagem](#especificidades-de-cada-linguagem)
+5. [Estratégias de Design](#estratégias-de-design)
+6. [Como Rodar Localmente](#como-rodar-localmente)
+7. [Como Adicionar uma Nova Linguagem](#como-adicionar-uma-nova-linguagem)
+
+---
+
 ## Visão Geral
 
-O **Worker Node** é o nome dado a este servidor dedicado responsável pelo processamento dos códigos submetidos pelos estudantes que utilizam o sistema **Machine Teaching**. É um microsserviço feito com o framework Flask que recebe códigos de usuários via HTTP, valida segurança e corretude, e retorna os resultados. Até o presente momento, o servidor cuida do processamento dos códigos escritos nas linguagens de programação **Python**, **C** e **Julia**. Para isso, é utilizado o módulo **subprocess** do Python.
+O **Worker Node** é um servidor dedicado responsável pelo processamento dos códigos submetidos pelos estudantes que utilizam o sistema **Machine Teaching**. Trata-se de um microsserviço desenvolvido com o framework Flask que:
+
+- Recebe códigos de usuários via HTTP
+- Valida segurança e corretude
+- Retorna os resultados ao sistema Web
+
+Atualmente, o servidor processa códigos escritos em **Python**, **C** e **Julia**, utilizando o módulo **subprocess** do Python para executar os códigos.
 
 ### Tecnologias Utilizadas
 
@@ -75,13 +93,25 @@ Esta é a lista de exceções personalizadas e seus respectivos códigos de iden
 
 ### 4. Execução dos Casos de Teste
 
-Caso o código enviado passe no pré-processamento, é possível começar a execução dos casos de teste.
+Caso o código enviado passe no pré-processamento, inicia-se a execução dos casos de teste. Para cada caso de teste do problema, as seguintes tarefas são realizadas:
 
-Para cada caso de teste do problema, as seguinte tarefas são realizadas:
+- **1. Preparação dos Códigos:**
+    - A classe da linguagem específica gera código nos arquivos `run_me` e `run_me_prof` com argumentos por meio dos métodos `base_code_with_args()` e `professor_code_with_args()`.
+    - Isto é feito de forma estratégica, gerando chamadas da função do problema passando como argumentos o caso de teste atual e comparando com o retorno da chamada da função do arquivo do professor.
+    - Apenas a estrutura final do código é montada aqui, e a estratégia varia conforme a linguagem com a qual se está trabalhando.
+    - No momento da execução, será possível tirar proveito desta estrutura ao verificar a saída gerada.
+    - Depois de preparar os códigos, eles são escritos nos arquivos temporários `run_me` e `run_me_prof`.
 
-1. A classe da linguagem específica gera código no arquivo `run_me` e `run_me_prof` com argumentos por meito do método `base_code_with_args()` e `professor_code_with_args()`. Isto é feito de forma estratégica, gerando chamadas da função do problema passando como argumentos o caso de teste atual e comparando com o retorno da chamada da função do arquivo do professor. Apenas a estrutura final do código é montada aqui, e a estratégia varia conforme a linguagem com a qual se está trabalhando. No momento da execução, será possível tirar proveito desta estrutura ao verificar a saída gerada. Depois de preparar os códigos, eles são escritos nos arquivos temporários `run_me` e `run_me_prof`
-2. O código que está no arquivo temporário `run_me` é executado por meio do método `run_code()` específico de cada classe de linguagem. Nesta etapa é utilizado o módulo `subprocess` do Python para simular um processo e executar um comando de compilação específico da linguagem. Caso algum erro aconteça, a mensagem de erro é extraída da saída gerada pelo `subprocess` para ser retornada. A extração de erros será explicada melhor mais a frente. Caso não seja gerado nada na saída de erros do `subprocess`, a saída do código é analisada para conferir se o código está correto ou não. Se o retorno da função do código do estudante for igual ao retorno da função do código do professor, aquele caso de teste é considerado bem sucedido. Se houve algum erro ou os retornos não forem iguais, o caso de teste falha. Isto é definido pelo parâmetro `isCorrect` que também é retornado ao sistema Web para cada caso de teste.
-3. Depois que todos os casos de teste são processados, os resultados de todos são retornados ao sistema Web e o Worker Node faz a limpeza do diretório temporário criado para armazenar os arquivos processados.
+- **2. Execução e Análise:**
+    - O código que está no arquivo temporário `run_me` é executado por meio do método `run_code()` específico de cada classe de linguagem.
+    - Nesta etapa é utilizado o módulo `subprocess` do Python para simular um processo e executar um comando de compilação específico da linguagem.
+    - Caso algum erro aconteça, a mensagem de erro é extraída da saída gerada pelo `subprocess` para ser retornada. A extração de erros será explicada melhor mais a frente.
+    - Caso não seja gerado nada na saída de erros do `subprocess`, a saída do código é analisada para conferir se o código está correto ou não.
+    - Se o retorno da função do código do estudante for igual ao retorno da função do código do professor, aquele caso de teste é considerado bem sucedido.
+    - Se houve algum erro ou os retornos não forem iguais, o caso de teste falha. Isto é definido pelo parâmetro `isCorrect` que também é retornado ao sistema Web para cada caso de teste.
+
+- **3. Finalização:**
+    - Depois que todos os casos de teste são processados, os resultados de todos são retornados ao sistema Web e o Worker Node faz a limpeza do diretório temporário criado para armazenar os arquivos processados.
 
 ### 5. Detecção e extração de mensagens de erro
 
@@ -136,11 +166,13 @@ Resposta gerada pelo Worker Node:
 ```json
 {
   "pre_process_error": true,
-  "code_status": 2,  //Importações inválidas
+  "code_status": 2,
   "message": "Potentially dangerous code found.",
   "final_code": ""
 }
 ```
+
+> **Nota:** O `code_status: 2` indica importações inválidas (ver tabela de exceções).
 
 ---
 
@@ -185,7 +217,7 @@ result = subprocess.run(["julia", file_path], capture_output=True, text=True, ti
 
 O problema aqui é que cada execução precisará enfrentar o tempo de inicialização do ambiente (Runtime) do Julia. Em um cenário normal, esse "Cold Start" ocorreria apenas na primeira execução, com as posteriores tirando vantagem dessa inicialização e sendo muito mais rápidas. Porém, aqui, essa inicialização não é aproveitada já que um novo subprocess é chamado para cada caso de teste, executando independentemente uns dos outros, e o Julia precisa fazer tudo do zero.
 
-Uma possível estraégia é utilizar sempre a mesma sessão do Julia (com o REPL, por exemplo) para todos os casos de teste. Dessa forma, a primeira execução será lenta, mas a partir da segunda será quase instantânea. Atualmente, esse tipo de estratégia está sendo estudada, mas ainda não foi implementada. Dessa forma, enquanto a otimização para a linguagem Julia não ocorre, os problemas do Macine Teaching focam principalmente em Python e C.
+Uma possível estratégia é utilizar sempre a mesma sessão do Julia (com o REPL, por exemplo) para todos os casos de teste. Dessa forma, a primeira execução será lenta, mas a partir da segunda será quase instantânea. Atualmente, esse tipo de estratégia está sendo estudada, mas ainda não foi implementada. Dessa forma, enquanto a otimização para a linguagem Julia não ocorre, os problemas do Machine Teaching focam principalmente em Python e C.
 
 ---
 
@@ -202,12 +234,11 @@ O padrão Factory foi adotado aqui para gerar objetos específicos de cada class
 ### Template Method (baselanguage.py)
 
 Métodos que cada linguagem deve implementar:
-- `base_code_with_args()` - Gera código personalizado para ser executado
-- `professor_code_with_args()` - Prepara código do professor
-- `evaluate_file()` - Análise estática do código
-- `run_pre_process_code()` - Executa o código na fase de pré-processamento
-- `run_code()` - Executa código para cada caso de teste
-- `pre_process_code()` - Remove comentários e valida
+- `base_code_with_args()`: Monta o código que será executado com o caso de teste |
+- `professor_code_with_args()`: Prepara o código do professor para comparação |
+- `run_pre_process_code()`: Valida sintaxe/compilação antes dos testes |
+- `run_code()`: Executa o código e retorna a saída |
+- `pre_process_code()`: Aplica validações de segurança (blacklist, prints, imports) |
 
 
 ### Variáveis de Ambiente
@@ -229,3 +260,117 @@ Métodos que cada linguagem deve implementar:
 - Diretório temporário único criado por requisição (UUID)
 - Cleanup automático após execução
 - Processo filho com timeout via `subprocess.run()`
+
+---
+
+## Como Rodar Localmente
+
+### Pré-requisitos
+
+- Python 3.10+
+- GCC (para processar códigos em C)
+- Julia 1.9+ (para processar códigos em Julia)
+
+### Opção 1: Executar diretamente com Python
+
+```bash
+# 1. Navegue até o diretório do worker_node
+cd worker_node
+
+# 2. Crie e ative um ambiente virtual
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# ou: venv\Scripts\activate  # Windows
+
+# 3. Instale as dependências
+pip install -r requirements.txt
+
+# 4. Execute o servidor Flask
+cd src
+python3 server.py
+```
+
+### Opção 2: Executar com Docker
+
+```bash
+cd worker_node
+
+# Construir e executar a imagem:
+docker build -t worker-node .
+docker run -it --env PORT=5000 -p 5000:5000 worker-node
+```
+
+### Verificando o funcionamento
+
+Após iniciar o servidor, acesse `http://localhost:5000/` para verificar o health check.
+
+---
+
+## Como Adicionar uma Nova Linguagem
+
+Para adicionar suporte a uma nova linguagem de programação, é possível seguir alguns passos:
+
+### 1. Criar a classe da linguagem
+
+Crie um novo arquivo em `worker_node/src/` (ex: `<linguagem>lang.py`) implementando a classe que herda de `BaseLanguage`:
+
+```python
+from baselanguage import BaseLanguage
+
+class NovaLanguage(BaseLanguage):
+    def __init__(self, langExtension: str):
+        super().__init__(langExtension)
+    
+    def base_code_with_args(self, baseCode, name_file_professor, funcName, funcNameProf, arg, returnType=""):
+        # Gera o código personalizado para execução do caso de teste
+        pass
+    
+    def professor_code_with_args(self, professorCode, funcName, funcNameProf, arg, returnType=""):
+        # Prepara o código do professor
+        pass
+    
+    def evaluate_file(self, absolute_path: str):
+        # Análise estática do código (opcional)
+        pass
+    
+    def run_pre_process_code(self, file_path: str):
+        # Executa o código para verificar erros de sintaxe/compilação
+        pass
+    
+    def run_code(self, file_path: str, isProfessorCode: bool):
+        # Executa o código para um caso de teste
+        pass
+    
+    def pre_process_code(self, code: str, code_path: str):
+        # Remove comentários, valida imports/prints, aplica blacklist
+        pass
+```
+
+### 2. Registrar no LanguageFactory
+
+Edite `worker_node/src/languagefactory.py` para incluir a nova linguagem:
+
+```python
+from novalang import NovaLanguage  # Adicione o import
+
+class LanguageFactory():
+    @staticmethod
+    def create_object_language(language: str) -> BaseLanguage:
+        if language == "Python":
+            return PythonLanguage(".py")
+        elif language == "Julia":
+            return JuliaLanguage(".jl")
+        elif language == "C":
+            return CLanguage(".c")
+        elif language == "NovaLinguagem": 
+            return NovaLanguage(".ext")
+        else:
+            raise ValueError(f"Unknown language: {language}")
+```
+
+### 3. Considerações
+
+- Defina uma **blacklist** de funções/imports perigosos para a linguagem
+- Implemente a **extração de erros** com regex específico para o formato de erro da linguagem
+- Se a linguagem necessitar de compilação, crie um método `compile_code()` separado (similar ao C)
+- Atualize o Docker para incluir o runtime da nova linguagem, se necessário
