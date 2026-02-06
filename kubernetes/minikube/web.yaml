@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mt-web-configmap
+data:
+  ENVIRONMENT: "dev"
+
+  #DB_HOST: "host.minikube.internal"     #IP da máquina com o banco
+  #DB_HOST: "trolley.proxy.rlwy.net"
+  #CONEXÃO COM O BANCO INTERNO
+  #DB_HOST: "mt-db-svc"      #Nome do Service do banco
+  DB_HOST: "mt-db-svc-1"      #Nome do Service do banco
+  DB_PORT: "5432"              #Porta interna do container do banco
+
+  #CONFIGURAÇÕES DJANGO
+  DJANGO_SUPERUSER_USERNAME: "admin@machineteaching.tech"
+  DJANGO_SUPERUSER_EMAIL: "admin@machineteaching.tech"
+  #ALLOWED_HOSTS: "localhost,127.0.0.1"
+  ALLOWED_HOSTS: "*"   #Para funcionar com o minikube
+  CSRF_TRUSTED_ORIGINS: "localhost, 127.0.0.1"
+
+  #ENVIO DE EMAILS
+  EMAIL_HOST_USER: "apikey"
+  DEFAULT_FROM_EMAIL: "equipe@machineteaching.tech"
+
+  #CONFIGURAÇÃO DO WORKER
+  WORKER_NODE_HOST: "http://mt-worker-svc:"
+  WORKER_NODE_PORT: "5000"
+  PORT: "8020"
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mt-web-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mt-web
+  template:
+    metadata:
+      labels:
+        app: mt-web
+    spec:
+      containers:
+        - name: mt-web-container
+          image: nickashu/web_teste:v1.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8020
+          
+          env:
+          - name: DB_PASSWORD   #Nome que o DJANGO quer
+            valueFrom:
+              secretKeyRef:
+                name: mt-secrets
+                key: POSTGRES_PASSWORD
+          - name: DB_NAME
+            valueFrom:
+              secretKeyRef:
+                name: mt-secrets
+                key: POSTGRES_DB
+          - name: DB_USER
+            valueFrom:
+              secretKeyRef:
+                name: mt-secrets
+                key: POSTGRES_USER
+          envFrom:
+            - configMapRef:
+                name: mt-web-configmap
+            - secretRef:
+                name: mt-secrets
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: mt-web-svc
+spec:
+  type: LoadBalancer
+  selector:
+    app: mt-web
+  ports:
+    - protocol: TCP
+      port: 8020
+      targetPort: 8020
+      #nodePort: 30080  #ou qualquer porta entre 30000–32767

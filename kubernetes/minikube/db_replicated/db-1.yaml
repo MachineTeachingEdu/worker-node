@@ -1,0 +1,185 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mt-db-svc-1
+  labels:
+    app: mt-db-1
+spec:
+  ports:
+  - port: 5432
+    targetPort: 5432
+    name: postgres
+  clusterIP: None
+  selector:
+    app: mt-db-1
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-configmap-1
+data: 
+  pg_hba.conf: |+
+    # TYPE  DATABASE        USER            ADDRESS                 METHOD
+    host     replication     replicationuser         0.0.0.0/0        md5
+    # "local" is for Unix domain socket connections only
+    local   all             all                                     trust
+    # IPv4 local connections:
+    host    all             all             127.0.0.1/32            trust
+    # IPv6 local connections:
+    host    all             all             ::1/128                 trust
+    # Allow replication connections from localhost, by a user with the
+    # replication privilege.
+    local   replication     all                                     trust
+    host    replication     all             127.0.0.1/32            trust
+    host    replication     all             ::1/128                 trust
+
+    host all all all scram-sha-256
+  postgresql.conf: |+
+    data_directory = '/data/pgdata'
+    hba_file = '/config/pg_hba.conf'
+    ident_file = '/config/pg_ident.conf'
+
+    port = 5432
+    listen_addresses = '*'
+    max_connections = 100
+    shared_buffers = 128MB
+    dynamic_shared_memory_type = posix
+    max_wal_size = 1GB
+    min_wal_size = 80MB
+    log_timezone = 'America/Sao_Paulo'
+    timezone = 'America/Sao_Paulo'
+
+    default_text_search_config = 'pg_catalog.english'
+
+    #replication
+    wal_level = replica
+    archive_mode = on
+    archive_command = 'test ! -f /data/archive/%f && cp %p /data/archive/%f'
+    max_wal_senders = 3
+
+---
+
+#StatefulSet (O Gerenciador com Estado)
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mt-db-statefulset-1
+spec:
+  serviceName: "mt-db-svc-1"  #Obrigatório no StatefulSet
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mt-db-1
+  template:
+    metadata:
+      labels:
+        app: mt-db-1
+    spec:
+      terminationGracePeriodSeconds: 30
+      initContainers:
+      - name: init
+        image: postgres:15.0
+        command: [ "bash", "-c" ]
+        args:
+        - |
+          # Garante que as pastas existam
+          mkdir -p /data/pgdata
+          mkdir -p /data/archive
+          # Ajusta permissões para o usuário 999 (postgres)
+          # Isso é vital para o pg_basebackup funcionar na réplica!
+          chown -R 999:999 /data
+          chmod 700 /data/pgdata
+          # ---------------------------------------
+
+          if [ ${STANDBY_MODE} == "on" ]; 
+          then
+            # Lógica da Réplica
+            if [ -z "$(ls -A ${PGDATA})" ]; then
+              echo "Iniciando clonagem do mestre..."
+              export PGPASSWORD=${REPLICATION_PASSWORD}
+              # Adicionei user postgres (-U) no comando ou garanta que roda como user correto
+              pg_basebackup -h ${PRIMARY_SERVER_ADDRESS} -p 5432 -U ${REPLICATION_USER} -D ${PGDATA} -Fp -Xs -R
+            fi
+          else
+            # Lógica do Mestre
+            echo "Configurando Mestre..."
+            
+            # Cria o init.sql para criar o usuário de replicação
+            echo "CREATE USER #REPLICATION_USER REPLICATION LOGIN ENCRYPTED PASSWORD '#REPLICATION_PASSWORD';" > init.sql
+            
+            sed -i 's/#REPLICATION_USER/'${REPLICATION_USER}'/g' init.sql
+            sed -i 's/#REPLICATION_PASSWORD/'${REPLICATION_PASSWORD}'/g' init.sql
+
+            mkdir -p /docker-entrypoint-initdb.d/
+            cp init.sql /docker-entrypoint-initdb.d/init.sql
+          fi
+        env:
+        - name: STANDBY_MODE
+          value: "off"
+        - name: PRIMARY_SERVER_ADDRESS
+          value: ""
+        - name: PGDATA
+          value: "/data/pgdata"
+        - name: REPLICATION_USER
+          valueFrom:
+            secretKeyRef:
+              name: mt-secrets
+              key: REPLICATION_USER
+              optional: false
+        - name: REPLICATION_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mt-secrets
+              key: REPLICATION_PASSWORD
+              optional: false
+        volumeMounts:
+        - name: initdb 
+          mountPath: /docker-entrypoint-initdb.d
+        - name: mt-db-disk
+          mountPath: /data
+          readOnly: false
+      containers:
+      - name: mt-db
+        image: postgres:15.0
+        args: ["-c", "config_file=/config/postgresql.conf"]
+        ports:
+        - containerPort: 5432
+
+        env:
+        - name: PGDATA
+          value: "/data/pgdata"   # O Postgres vai escrever numa subpasta do disco
+        envFrom:
+        - secretRef:
+            name: mt-secrets
+            
+        #Montando os volumes
+        volumeMounts:
+        - name: initdb
+          mountPath: /docker-entrypoint-initdb.d
+        - name: config
+          mountPath: /config
+          readOnly: false
+        - name: mt-db-disk
+          mountPath: /data
+          readOnly: false
+        
+      volumes:
+      - name: config
+        configMap:
+          name: postgres-configmap-1
+          defaultMode: 0755
+      - name: initdb
+        emptyDir: {}
+
+  #O K8s usa isso para criar um PVC novo para cada réplica automaticamente
+  volumeClaimTemplates:
+  - metadata:
+      name: mt-db-disk
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "standard"  #Usa o storage padrão do minikube
+      resources:
+        requests:
+          storage: 1Gi

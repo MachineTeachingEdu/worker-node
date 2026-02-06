@@ -224,6 +224,7 @@ def multi_process():
         """
 
         tle = False
+        #Para cada caso de teste:
         for index, testCase in enumerate(testCases):
             #print(testCase)
             try:
