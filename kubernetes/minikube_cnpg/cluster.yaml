@@ -1,0 +1,23 @@
+#Este arquivo define o Cluster do CloudNativePG (CNPG) para o Minikube. Ele especifica a configuração do banco de dados PostgreSQL, 
+#incluindo o número de instâncias, a imagem a ser usada, as configurações iniciais e o armazenamento.
+
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: mt-db-cluster
+spec:
+  instances: 2   #Para testes no Minikube, teremos 1 Mestre e 1 Réplica
+  #imageName: postgres:15.0
+  
+  #Configuração inicial do banco de dados
+  bootstrap:
+    initdb:
+      database: "machine_teaching_db"   #Aqui é como se fosse o DB_NAME
+      owner: "machineteaching"       #Aqui é como se fosse o DB_USER. O CNPG vai criar esse usuário e dar permissão no banco acima
+      secret:
+        name: mt-secrets   #Aponta para o arquivo de secrets
+  
+  #Configuração do disco local do Minikube
+  storage:
+    size: 1Gi
+    storageClass: standard

@@ -1,0 +1,15 @@
+#Este arquivo define o PodMonitor para o CloudNativePG (CNPG). Ele é usado para monitorar os pods do cluster CNPG usando o 
+#Prometheus Operator. O PodMonitor seleciona os pods com base em rótulos e especifica que as métricas devem ser coletadas a partir da 
+#porta "metrics" exposta pelos pods do CNPG.
+
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: mt-db-monitor
+spec:
+  selector:
+    matchLabels:
+      #O nome exato do cluster
+      cnpg.io/cluster: mt-db-cluster
+  podMetricsEndpoints:
+  - port: metrics
