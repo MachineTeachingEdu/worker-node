@@ -20,4 +20,6 @@ spec:
   #Configuração do disco local do Minikube
   storage:
     size: 1Gi
+    #size: 500Mi  #Outra opção menor para a VM
     storageClass: standard
+    #storageClass: local-path   #Outra opção para o K3s

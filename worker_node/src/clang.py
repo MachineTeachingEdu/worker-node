@@ -43,6 +43,37 @@ int main() {{
 """
         return resultArgs
     
+    
+    def base_code_with_args_validate(self, baseCode: str, funcName: str, arg: str, expected_output: str, returnType):
+        argsTxt = extract_args(arg)
+        self.__baseCodeLines = len(baseCode.splitlines())
+        self.__offsetCodeLines = 4
+        printf_returnType = formats_printf[returnType]
+        line_comparison = f'printf("%d\\n", {funcName}({argsTxt}) == {expected_output});'
+        
+        if printf_returnType == "%f" or printf_returnType == "%lf":    #Se o retorno for do tipo float ou double, a comparação será feita com uma tolerância
+            tolerancia = '0.0001'    #Tolerância
+            line_comparison = f'printf("%d\\n", fabs({funcName}({argsTxt}) - {expected_output})) < {tolerancia});'
+            
+        if printf_returnType == "%s":  #Se o retorno for uma string, a comparação será feita com a função strcmp
+            line_comparison = f'printf("%d\\n", strcmp({funcName}({argsTxt}), {expected_output})) == 0);'
+        
+        resultArgs = f"""#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <math.h>
+{baseCode}
+int main() {{
+    {line_comparison}
+    printf("{printf_returnType}\\n", {funcName}({argsTxt}));
+    printf("{printf_returnType}", {expected_output});
+    return 0;
+}}
+"""
+        return resultArgs
+    
+
+    
     def professor_code_with_args(self, professorCode: str, funcName: str, funcNameProf: str, arg, returnType = ""):
         printf_returnType = formats_printf[returnType]
         argsTxt = extract_args(arg)
@@ -111,6 +142,17 @@ int main(){{
             file.write(codeWithMain)
         self.run_pre_process_code(code_path)   #Checando por erros na compilação do código
         return code
+    
+    def format_value(self, value: str, type: str, isReturn: bool = False):
+        if type == "char":
+            return f"'{value}'"
+        elif type == "string":
+            escaped_value = value.replace('\\', '\\\\').replace('"', '\\"')  #Trocando caracteres especiais por suas versões escapadas
+            return f'"{escaped_value}"'
+        elif type == "bool":
+            return "1" if value else "0"
+        else:
+            return str(value)
 
 formats_printf = {
     "int": "%d",

@@ -106,6 +106,15 @@ class JuliaLanguage(BaseLanguage):
         self.run_pre_process_code(code_path)
         return code
     
+    def format_value(self, value: str, type: str, isReturn: bool = False):
+        if type == "str":
+            escaped_value = value.replace('\\', '\\\\').replace('"', '\\"')
+            return f'"{escaped_value}"'
+        elif type == "bool":
+            return "True" if value else "False"
+        else:
+            return str(value)
+    
     
 def process_errors(stderr: str, offSetLines: int, baseCodeLines: int, file_path: str):
     path = os.path.normpath(file_path)

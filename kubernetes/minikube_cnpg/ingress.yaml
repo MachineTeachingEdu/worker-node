@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mt-ingress
+  annotations:
+    kubernetes.io/ingress.class: traefik  #Diz ao Kubernetes para usar o Traefik (padrão do K3s) como roteador
+spec:
+  ingressClassName: nginx      #A forma moderna de designar o NGINX como roteador
+  rules:
+  - host: machineteaching.uniriotec.br   #O domínio do sistema
+    http:
+      paths:
+        #Tudo que chegar na raiz do site (/)
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: mt-web-svc   #O nome do serviço web (que deve ser do tipo ClusterIP)
+            port:
+              number: 8020  #A porta interna que o Service está escutando

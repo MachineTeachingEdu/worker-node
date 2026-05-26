@@ -6,7 +6,6 @@ import os
 import json
 import subprocess
 import re
-#import sys
 
 class PythonLanguage(BaseLanguage):
     def __init__(self, langExtension:str):   
@@ -39,6 +38,33 @@ if error:
     error_message = str(error)
     print(f"{{line_number}}\\n{{error_type}}\\n{{error_message}}", flush=True)"""
         return resultArgs
+    
+    
+    def base_code_with_args_validate(self, baseCode: str, funcName: str, arg: str, expected_output: str, returnType):
+        self.__baseCodeLines = len(baseCode.splitlines())
+        self.__offsetCodeLines = 3
+        baseCode = '\n'.join('        ' + linha for linha in baseCode.splitlines())     #Adicionando identação
+        resultArgs = f"""import traceback
+def execute_code():
+    try:
+{baseCode}
+        print({funcName}(*{arg}) == {expected_output}, flush=True)
+        print({funcName}(*{arg}), flush=True)
+        print(f"{{{expected_output}}}", flush=True)
+        print("NoErrors", flush=True)
+    except Exception as e:
+        return e, traceback.extract_tb(e.__traceback__)
+    return None, None
+
+error, tb_list = execute_code()
+if error:
+    tb_last = tb_list[-1]
+    line_number = tb_last.lineno - {self.__offsetCodeLines}
+    error_type = type(error).__name__
+    error_message = str(error)
+    print(f"{{line_number}}\\n{{error_type}}\\n{{error_message}}", flush=True)"""
+        return resultArgs
+    
     
     def professor_code_with_args(self, professorCode: str, funcName: str, funcNameProf: str, arg, returnType = ""):
         outputProf = f"\nprint({funcName}(*{arg}))"
@@ -144,6 +170,15 @@ if error:
         verify_against_blacklist(code_without_comments)   #Verificando importações inválidas
         self.run_pre_process_code(code_path)   #Verificando erros de sintaxe
         return code
+    
+    def format_value(self, value: str, type: str, isReturn: bool = False):
+        if type == "string":
+            escaped_value = value.replace('\\', '\\\\').replace('"', '\\"')
+            return f'"{escaped_value}"'
+        elif type == "bool":
+            return "True" if value else "False"
+        else:
+            return str(value)
     
 
 def process_errors(stderr: str, offSetLines: int):

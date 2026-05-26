@@ -15,6 +15,7 @@ metadata:
     app: mt-worker
 spec:
   replicas: 2
+  #replicas: 1  #Para a VM
   selector:
     matchLabels:
       app: mt-worker
@@ -48,6 +49,7 @@ kind: Service
 metadata:
   name: mt-worker-svc
 spec:
+  #O tipo padrão é ClusterIP, que é o que queremos para a comunicação interna entre os pods. Ele não expõe o serviço para fora do cluster.
   selector:
     app: mt-worker
   ports:
