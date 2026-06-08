@@ -95,8 +95,6 @@ def validate_solutions():
                 google.oauth2.id_token.verify_token(creds, google.auth.transport.requests.Request())
                 #logging.info("Authorization check passed.")
                 
-    #vou precisar do header, solution e expected_output para cada solução/linguagem
-    
     #o request vai vir com o campo form com 'solutions_data' e 'test_cases_data', ambos contendo uma string JSON.
     #exemplo: 
     #solutions_data: '{"Python":{"header":"soma","solution":"def soma(a, b):\\n    return 3"},"C":{"header":"soma","solution":"int soma(int a, float b){\\n\\treturn 3;\\n}"}}' 
@@ -126,12 +124,18 @@ def validate_solutions():
      
     
     TEMP_DIR = None
-    try:
-        TEMP_DIR = _create_temp_dir()
-        validation_results = []
+    validation_results = []
+    for lang, data in solutions.items():   #Cada solução é validada independentemente usando os casos de teste habilitados para a respectiva linguagem
+        language_result = {
+            'language': lang,
+            'details': {},
+            'test_case_results': [],
+            'num_test_cases': 0,
+            'passed_all': False,  #Indica se a solução passou em todos os casos de teste para aquela linguagem
+        }
+        try:
+            TEMP_DIR = _create_temp_dir()
 
-        #Cada solução é validada independentemente usando os casos de teste habilitados para a respectiva linguagem.
-        for lang, data in solutions.items():
             objLang = LanguageFactory.create_object_language(lang)
             langExtension = objLang.langExtension
             solution_code = data["solution"]
@@ -146,141 +150,145 @@ def validate_solutions():
             objLang.evaluate_file(solution_file_path)   #Checagem de vulnerabilidades
             final_code = objLang.pre_process_code(solution_code, solution_file_path)   #Removendo comentários do código e checando funções inválidas
 
-            language_result = {
-                'language': lang,
-                'details': [],
+        #Exceptions do pré-processamento:
+        except PrintException as e:
+            language_result['details'] = {
+                'pre_process_error': True,
+                'code_status': 1,    #Código com comandos de print
+                'message': e.message,
+                'final_code': '',
             }
-
-            for index, test_case in enumerate(test_cases['cases']):
-                if not test_case.get('languages', {}).get(lang, False):
-                    continue
-
-                language_result['num_test_cases'] += 1
-                #test_case.get("inputs") será algo do tipo [{'value': '5', 'type': 'int'}, {'value': '2', 'type': 'float'}]. vou precisar pegar esses valores e tipos, formatar os valores de acordo com os tipos e com a linguagem, e depois passar como argumento para o código da solução
-                
-                test_case_args = ""
-                list_test_cases = test_case.get("inputs", [])
-                for input in list_test_cases:
-                    val = input.get("value")
-                    input_type = input.get("type")
-                    formatted_val = objLang.format_value(val, input_type)
-                    test_case_args += formatted_val + ", "
-                test_case_args = test_case_args[:-2]  #Removendo a última vírgula e espaço
-                test_case_args = f"[{test_case_args}]"  
-
-                expected_output = objLang.format_value(test_case.get('expected'), test_cases['returnType'], isReturn=True)   #Formatando o expected output de acordo com a linguagem e o tipo de retorno esperado, para passar como argumento para o código da solução.
-                code_args = objLang.base_code_with_args_validate(final_code, func_name, test_case_args, expected_output, test_cases['returnType'])   #Gerando o código da solução formatado com os argumentos do caso de teste e o código necessário para imprimir a saída da função do professor, para que seja possível comparar com a saída esperada. O método base_code_with_args_validate é específico para esta etapa de validação das soluções, e é diferente do método base_code_with_args usado no endpoint de multiprocessamento, pois aqui não temos um código do professor para comparar, e sim apenas o expected output, então o código gerado precisa ser diferente para se adequar a esta situação.
-
-                with open(solution_file_path, 'w') as new_file:
-                    new_file.write(code_args)
-
-                try:
-                    code_output = objLang.run_code(solution_file_path, isProfessorCode=False)
-                    case_result = {
-                        'isCorrect': code_output[0],
-                        'code_output': code_output[1],
-                        'expected_output': expected_output,
-                        'test_case': test_case,
-                        'func_name': func_name,
-                        'hostname': socket.gethostname(),
-                    }
-                    status_code = 200
-                except CodeException as e:
-                    case_result = {
-                        'isCorrect': False,
-                        'code_output': e.message,
-                        'expected_output': expected_output,
-                        'test_case': test_case,
-                        'func_name': func_name,
-                        'hostname': socket.gethostname(),
-                    }
-                    status_code = 400
-                except subprocess.TimeoutExpired:
-                    case_result = {
-                        'isCorrect': False,
-                        'code_output': "Time limit exceeded: O código excedeu o tempo limite de execução.",
-                        'expected_output': expected_output,
-                        'test_case': test_case,
-                        'func_name': func_name,
-                        'hostname': socket.gethostname(),
-                    }
-                    status_code = 400
-                except Exception as e:
-                    case_result = {
-                        'isCorrect': False,
-                        'code_output': f"Exception error: {e}",
-                        'expected_output': expected_output,
-                        'test_case': test_case,
-                        'func_name': func_name,
-                        'hostname': socket.gethostname(),
-                    }
-                    status_code = 500
-
-                language_result['details'].append({
-                    'result': case_result,
-                    'status_code': status_code,
-                })
-
             validation_results.append(language_result)
+            if TEMP_DIR is not None:
+                _delete_temp_files(TEMP_DIR)
+            continue 
+        except ImportException as e:
+            language_result['details'] = {
+                'pre_process_error': True,
+                'code_status': 2,    #Importações inválidas
+                'message': e.message,
+                'final_code': '',
+            }
+            validation_results.append(language_result)
+            if TEMP_DIR is not None:
+                _delete_temp_files(TEMP_DIR)
+            continue
+        except DangerException as e:
+            language_result['details'] = {
+                'pre_process_error': True,
+                'code_status': 3,    #Vulnerabilidades detectadas no código
+                'message': e.message,
+                'final_code': '',
+            }
+            validation_results.append(language_result)
+            if TEMP_DIR is not None:
+                _delete_temp_files(TEMP_DIR)
+            continue
+        except CodeException as e:
+            language_result['details'] = {
+                'pre_process_error': True,
+                'code_status': 4,    #Erros no código
+                'message': e.message,
+                'final_code': '',
+            }
+            validation_results.append(language_result)
+            if TEMP_DIR is not None:
+                _delete_temp_files(TEMP_DIR)
+            continue
+        except subprocess.TimeoutExpired:
+            language_result['details'] = {
+                'pre_process_error': True,
+                'code_status': 5,    #TLE
+                'message': "Time limit exceeded: O código excedeu o tempo limite de execução.",
+                'final_code': '',
+            }
+            validation_results.append(language_result)
+            if TEMP_DIR is not None:
+                _delete_temp_files(TEMP_DIR)
+            continue
+        except Exception as e:
+            if TEMP_DIR is not None:
+                _delete_temp_files(TEMP_DIR)
+            return {'errorMsg': "Error: Couldn't extract .zip file and read the code."}, 500
 
-        _delete_temp_files(TEMP_DIR)
-        return jsonify(validation_results)
- 
-    except PrintException as e:
-        result = {
-            'pre_process_error': True,
-            'code_status': 1,    #Código com comandos de print
-            'message': e.message,
-            'final_code': '',
-        }
-        if TEMP_DIR is not None:
-            _delete_temp_files(TEMP_DIR)
-        return result
-    except ImportException as e:
-        result = {
-            'pre_process_error': True,
-            'code_status': 2,    #Importações inválidas
-            'message': e.message,
-            'final_code': '',
-        }
-        if TEMP_DIR is not None:
-            _delete_temp_files(TEMP_DIR)
-        return result
-    except DangerException as e:
-        result = {
-            'pre_process_error': True,
-            'code_status': 3,    #Vulnerabilidades detectadas no código
-            'message': e.message,
-            'final_code': '',
-        }
-        if TEMP_DIR is not None:
-            _delete_temp_files(TEMP_DIR)
-        return result
-    except CodeException as e:
-        result = {
-            'pre_process_error': True,
-            'code_status': 4,    #Erros no código
-            'message': e.message,
-            'final_code': '',
-        }
-        if TEMP_DIR is not None:
-            _delete_temp_files(TEMP_DIR)
-        return result
-    except subprocess.TimeoutExpired:
-        result = {
-            'pre_process_error': True,
-            'code_status': 5,    #TLE
-            'message': "Time limit exceeded: O código excedeu o tempo limite de execução.",
-            'final_code': '',
-        }
-        if TEMP_DIR is not None:
-            _delete_temp_files(TEMP_DIR)
-        return result
-    except Exception as e:
-        if TEMP_DIR is not None:
-            _delete_temp_files(TEMP_DIR)
-        return {'errorMsg': "Error: Couldn't extract .zip file and read the code."}, 500
+        num_succeeded_ = 0
+        for index, test_case in enumerate(test_cases['cases']):
+            if not test_case.get('languages', {}).get(lang, False):   #Se o caso de teste não estiver habilitado para a linguagem
+                continue
 
+            language_result['num_test_cases'] += 1
+            #Extraindo os casos de teste e formatando:
+            #test_case.get("inputs") será algo do tipo [{'value': '5', 'type': 'int'}, {'value': '2', 'type': 'float'}]. vou precisar pegar esses valores e tipos, formatar os valores de acordo com os tipos e com a linguagem, e depois passar como argumento para o código da solução
+            test_case_args = ""
+            list_test_cases = test_case.get("inputs", [])
+            for input in list_test_cases:
+                val = input.get("value")
+                input_type = input.get("type")
+                formatted_val = objLang.format_value(val, input_type)
+                test_case_args += formatted_val + ", "
+            test_case_args = test_case_args[:-2]  #Removendo a última vírgula e espaço
+            test_case_args = f"[{test_case_args}]"  
+
+            expected_output = objLang.format_value(test_case.get('expected'), test_cases['returnType'], isReturn=True)   #Formatando o expected output de acordo com a linguagem e o tipo de retorno esperado, para passar como argumento para o código da solução.
+            code_args = objLang.base_code_with_args_validate(final_code, func_name, test_case_args, expected_output, test_cases['returnType'])   #Gerando o código da solução formatado com os argumentos do caso de teste e o código necessário para imprimir a saída da função do professor, para que seja possível comparar com a saída esperada. O método base_code_with_args_validate é específico para esta etapa de validação das soluções, e é diferente do método base_code_with_args usado no endpoint de multiprocessamento, pois aqui não temos um código do professor para comparar, e sim apenas o expected output, então o código gerado precisa ser diferente para se adequar a esta situação.
+
+            with open(solution_file_path, 'w') as new_file:
+                new_file.write(code_args)
+
+            try:
+                code_output = objLang.run_code(solution_file_path, isProfessorCode=False)
+                case_result = {
+                    'isCorrect': code_output[0],
+                    'code_output': code_output[1],
+                    'inputs': test_case_args,
+                    'expected_output': expected_output,
+                    'func_name': func_name,
+                    'hostname': socket.gethostname(),
+                }
+                if isinstance(code_output[0], str) and code_output[0].lower() == "true":
+                    num_succeeded_ += 1
+                elif isinstance(code_output[0], bool) and code_output[0] == True:
+                    num_succeeded_ += 1
+                status_code = 200
+            except CodeException as e:
+                case_result = {
+                    'isCorrect': False,
+                    'code_output': e.message,
+                    'inputs': test_case_args,
+                    'expected_output': expected_output,
+                    'func_name': func_name,
+                    'hostname': socket.gethostname(),
+                }
+                status_code = 400
+            except subprocess.TimeoutExpired:
+                case_result = {
+                    'isCorrect': False,
+                    'code_output': "Time limit exceeded: O código excedeu o tempo limite de execução.",
+                    'inputs': test_case_args,
+                    'expected_output': expected_output,
+                    'func_name': func_name,
+                    'hostname': socket.gethostname(),
+                }
+                status_code = 400
+            except Exception as e:
+                case_result = {
+                    'isCorrect': False,
+                    'code_output': f"Exception error: {e}",
+                    'inputs': test_case_args,
+                    'expected_output': expected_output,
+                    'func_name': func_name,
+                    'hostname': socket.gethostname(),
+                }
+                status_code = 500
+
+            language_result['test_case_results'].append({'test_case_result': case_result, 'status_code': status_code})
+
+        language_result['passed_all'] = (num_succeeded_ == len(test_cases['cases'])) and len(test_cases['cases']) > 0
+        validation_results.append(language_result)
+        if TEMP_DIR is not None:
+            _delete_temp_files(TEMP_DIR)
+        
+    return jsonify(validation_results)
 
 
 @app.route('/multi_process', methods=['POST'])    #Endpoint usado para o processamento dos códigos submetidos com multiprocessamento de todos os casos de teste

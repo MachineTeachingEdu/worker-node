@@ -173,7 +173,7 @@ if error:
     
     def format_value(self, value: str, type: str, isReturn: bool = False):
         if type == "string":
-            escaped_value = value.replace('\\', '\\\\').replace('"', '\\"')
+            escaped_value = value.replace('\\', '\\\\').replace('"', '\\"')   #Substituindo \ por \\ e " por \"
             return f'"{escaped_value}"'
         elif type == "bool":
             return "True" if value else "False"

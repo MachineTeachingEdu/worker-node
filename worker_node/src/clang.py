@@ -149,10 +149,12 @@ int main(){{
         elif type == "string":
             escaped_value = value.replace('\\', '\\\\').replace('"', '\\"')  #Trocando caracteres especiais por suas versões escapadas
             return f'"{escaped_value}"'
+        elif type == "float":
+            return f'{value}.0' if '.' not in value else f'{value}'  #Garantindo que o valor seja interpretado como float, adicionando .0 se for um número inteiro
         elif type == "bool":
-            return "1" if value else "0"
+            return "1" if value == "true" else "0"
         else:
-            return str(value)
+            return f'{str(value)}'
 
 formats_printf = {
     "int": "%d",
@@ -174,7 +176,7 @@ def extract_args(args):
         argsTxt = ""
         for i, arg in enumerate(list_args):
             if isinstance(arg, str):
-                if len(arg) == 1:
+                if len(arg) == 1:  #Tratando o caso de char, que deve ser formatado com aspas simples
                     argsTxt += f"'{arg}'"
                 else:
                     argsTxt += f'"{arg}"'
